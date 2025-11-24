@@ -222,5 +222,64 @@ namespace TodoListApp.Controllers
         {
             return await _context.TodoTasks.AnyAsync(e => e.Id == id);
         }
+
+        /// <summary>
+        /// Elimina una tarea
+        /// </summary>
+        [HttpDelete("{id}")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<ActionResult> DeleteTask(int id)
+        {
+            var task = await _context.TodoTasks.FindAsync(id);
+
+            if (task == null)
+            {
+                return NotFound(new { message = $"Tarea con ID {id} no encontrada" });
+            }
+
+            _context.TodoTasks.Remove(task);
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                message = "Tarea eliminada exitosamente",
+                deletedTask = new
+                {
+                    id = task.Id,
+                    title = task.Title
+                }
+            });
+        }
+
+        /// <summary>
+        /// Elimina todas las tareas completadas
+        /// </summary>
+        [HttpDelete("completed")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        public async Task<ActionResult> DeleteCompletedTasks()
+        {
+            var completedTasks = await _context.TodoTasks
+                .Where(t => t.IsCompleted)
+                .ToListAsync();
+
+            if (!completedTasks.Any())
+            {
+                return Ok(new
+                {
+                    message = "No hay tareas completadas para eliminar",
+                    count = 0
+                });
+            }
+
+            _context.TodoTasks.RemoveRange(completedTasks);
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                message = $"{completedTasks.Count} tarea(s) completada(s) eliminada(s)",
+                count = completedTasks.Count
+            });
+        }
     }
 }
