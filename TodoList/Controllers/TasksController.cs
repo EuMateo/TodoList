@@ -134,5 +134,93 @@ namespace TodoListApp.Controllers
 
             return Ok(task);
         }
+
+        /// <summary>
+        /// Actualiza una tarea existente
+        /// </summary>
+        [HttpPut("{id}")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<ActionResult<TodoTask>> UpdateTask(int id, [FromBody] UpdateTaskDto updateTaskDto)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            var task = await _context.TodoTasks.FindAsync(id);
+
+            if (task == null)
+            {
+                return NotFound(new { message = $"Tarea con ID {id} no encontrada" });
+            }
+
+            // Actualizar propiedades
+            task.Title = updateTaskDto.Title;
+            task.Description = updateTaskDto.Description;
+            task.Priority = updateTaskDto.Priority;
+
+            // Manejar cambio de estado
+            if (updateTaskDto.IsCompleted && !task.IsCompleted)
+            {
+                task.IsCompleted = true;
+                task.CompletedAt = DateTime.Now;
+            }
+            else if (!updateTaskDto.IsCompleted && task.IsCompleted)
+            {
+                task.IsCompleted = false;
+                task.CompletedAt = null;
+            }
+
+            try
+            {
+                _context.TodoTasks.Update(task);
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                if (!await TaskExists(id))
+                {
+                    return NotFound();
+                }
+                throw;
+            }
+
+            return Ok(task);
+        }
+
+        /// <summary>
+        /// Marca o desmarca una tarea como completada
+        /// </summary>
+        [HttpPatch("{id}/complete")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<ActionResult<TodoTask>> ToggleComplete(int id)
+        {
+            var task = await _context.TodoTasks.FindAsync(id);
+
+            if (task == null)
+            {
+                return NotFound(new { message = $"Tarea con ID {id} no encontrada" });
+            }
+
+            task.IsCompleted = !task.IsCompleted;
+            task.CompletedAt = task.IsCompleted ? DateTime.Now : null;
+
+            _context.TodoTasks.Update(task);
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                message = task.IsCompleted ? "Tarea marcada como completada" : "Tarea marcada como pendiente",
+                task = task
+            });
+        }
+
+        private async Task<bool> TaskExists(int id)
+        {
+            return await _context.TodoTasks.AnyAsync(e => e.Id == id);
+        }
     }
 }
